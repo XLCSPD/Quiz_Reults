@@ -3,91 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase 'quizResults' Viewer</title>
+    <title>Firebase 'quizResults' Viewer & Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         /* Styles for table and sorting indicators */
-        table {
-            width: 100%;
-            border-collapse: collapse; /* Combine cell borders */
-        }
-        th, td {
-            border: 1px solid #ddd; /* Add borders to cells */
-            padding: 10px; /* Add padding within cells */
-            text-align: left; /* Align text to the left */
-            vertical-align: top; /* Align content to the top */
-        }
-        th {
-            background-color: #f2f2f2; /* Light grey background for headers */
-            cursor: pointer; /* Indicate headers are clickable */
-            position: relative; /* Needed for positioning sort indicators */
-            user-select: none; /* Prevent text selection on click */
-        }
-        /* Style for the sort indicators (arrows) */
-        th .sort-indicator {
-            position: absolute;
-            right: 10px; /* Position indicator to the right */
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 0.8em;
-            color: #666; /* Grey color for indicators */
-        }
-        /* Hide indicators by default */
-        th .sort-indicator .asc,
-        th .sort-indicator .desc {
-            display: none;
-        }
-        /* Show the correct indicator based on sort direction */
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
+        th { background-color: #f2f2f2; cursor: pointer; position: relative; user-select: none; }
+        th .sort-indicator { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 0.8em; color: #666; }
+        th .sort-indicator .asc, th .sort-indicator .desc { display: none; }
         th.sort-asc .sort-indicator .asc { display: inline; }
         th.sort-desc .sort-indicator .desc { display: inline; }
+        td pre { background-color: #f8f8f8; border: 1px solid #eee; border-radius: 4px; padding: 5px; margin: 0; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; font-size: 0.9em; }
+        body { font-family: 'Inter', sans-serif; }
+        .services-text { letter-spacing: 0.15em; }
 
-        /* Basic styles for preformatted text within table cells */
-        td pre {
-            background-color: #f8f8f8;
-            border: 1px solid #eee;
-            border-radius: 4px;
-            padding: 5px;
-            margin: 0; /* Remove default margin */
-            overflow-x: auto;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            font-size: 0.9em; /* Slightly smaller font for pre */
+        /* Styles for active/inactive tabs */
+        .tab-button {
+            padding: 8px 16px;
+            margin-right: 5px;
+            border-radius: 6px 6px 0 0;
+            background-color: #e5e7eb; /* gray-200 */
+            color: #4b5563; /* gray-600 */
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-bottom: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
         }
-         /* Ensure Inter font is loaded */
-        body {
-            font-family: 'Inter', sans-serif;
+        .tab-button.active {
+            background-color: #ffffff; /* white */
+            color: #1f2937; /* gray-800 */
+            border-bottom: 1px solid #ffffff; /* Hide bottom border effectively */
+            position: relative;
+            top: 1px; /* Align with the top border of the content area */
         }
-        /* Custom style for SERVICES text to increase letter spacing more */
-        .services-text {
-            letter-spacing: 0.15em; /* Adjust this value for desired spacing */
+        .tab-button:hover:not(.active) {
+             background-color: #f3f4f6; /* gray-100 */
         }
+        .tab-content {
+            display: none; /* Hide content by default */
+            border: 1px solid #d1d5db; /* gray-300 */
+            border-top: none;
+            padding: 24px; /* p-6 */
+            background-color: #ffffff; /* white */
+            border-radius: 0 0 6px 6px; /* Rounded bottom corners */
+        }
+        .tab-content.active {
+            display: block; /* Show active content */
+        }
+         /* Chart container styling */
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 300px; /* Adjust height as needed */
+            width: 100%;
+             max-width: 500px; /* Limit max width for larger screens */
+            margin-bottom: 2rem; /* Add space below charts */
+        }
+
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"> </head>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+</head>
 <body class="bg-gray-100 font-['Inter']">
 
     <div class="container mx-auto p-6">
 
         <div class="text-center mb-8">
-            <div class="text-5xl font-black text-black tracking-tight">
-                XLC
-            </div>
-            <div class="text-xl font-medium text-black uppercase services-text mt-1">
-                SERVICES
-            </div>
+            <div class="text-5xl font-black text-black tracking-tight">XLC</div>
+            <div class="text-xl font-medium text-black uppercase services-text mt-1">SERVICES</div>
         </div>
 
         <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">Firebase 'quizResults' Data Viewer</h1>
 
-        <div id="config-status" class="mb-4 p-3 rounded-lg text-center font-semibold">
-            </div>
+        <div id="config-status" class="mb-4 p-3 rounded-lg text-center font-semibold"></div>
 
         <div class="bg-white p-4 rounded-lg shadow-md mb-6 text-center">
-             <p class="text-sm text-gray-600 mb-2">Click the button to fetch and display data from the 'quizResults' collection.</p>
-            <button id="fetch-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
-                Fetch 'quizResults' Data
-            </button>
+             <p class="text-sm text-gray-600 mb-2">Click the button to fetch data from the 'quizResults' collection.</p>
+             <div class="flex justify-center space-x-4">
+                 <button id="fetch-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                     Fetch 'quizResults' Data
+                 </button>
+                 <button id="download-csv-button" disabled class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                     Download CSV
+                 </button>
+             </div>
         </div>
 
         <div id="loading" class="text-center my-4 hidden">
@@ -100,10 +102,36 @@
             <span class="block sm:inline" id="error-text"></span>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
-            <h2 class="text-xl font-semibold mb-3 text-gray-700">Data:</h2>
-            <div id="data-output" class="text-sm text-gray-800">
-                Click the button above to fetch data.
+        <div class="mb-0 border-b border-gray-300">
+            <button id="tab-table" class="tab-button active" onclick="switchTab('table')">View Table</button>
+            <button id="tab-dashboard" class="tab-button" onclick="switchTab('dashboard')">View Dashboard</button>
+        </div>
+
+        <div>
+            <div id="table-view" class="tab-content active shadow-md overflow-x-auto">
+                <h2 class="text-xl font-semibold mb-3 text-gray-700">Data Table:</h2>
+                <div id="data-output" class="text-sm text-gray-800">
+                    Click the "Fetch Data" button above.
+                </div>
+            </div>
+
+            <div id="dashboard-view" class="tab-content shadow-md">
+                <h2 class="text-xl font-semibold mb-6 text-gray-700">Dashboard Insights:</h2>
+                <div id="dashboard-output" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div class="chart-container">
+                         <h3 class="text-center font-medium text-gray-600 mb-2">Score Distribution</h3>
+                         <canvas id="scoreDistributionChart"></canvas>
+                     </div>
+                     <div class="chart-container">
+                         <h3 class="text-center font-medium text-gray-600 mb-2">Pass/Fail Rate</h3>
+                         <canvas id="passFailChart"></canvas>
+                     </div>
+                     <div class="chart-container">
+                         <h3 class="text-center font-medium text-gray-600 mb-2">Results per Quiz</h3>
+                         <canvas id="resultsPerQuizChart"></canvas>
+                     </div>
+                     </div>
+                 <p id="dashboard-message" class="text-center text-gray-500 mt-4"></p>
             </div>
         </div>
 
@@ -113,296 +141,268 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
     <script>
-        // --- STEP 1: PASTE YOUR FIREBASE CONFIGURATION HERE ---
-        // Ensure this configuration is correct for your project.
-        const firebaseConfig ={
-            apiKey: "AIzaSyAYdn17zrJgCvmartYmjTvRasY8LoWNsKA", // Replace if necessary
-            authDomain: "forklift-training-app-bb7c2.firebaseapp.com", // Replace if necessary
-            projectId: "forklift-training-app-bb7c2", // Replace if necessary
-            storageBucket: "forklift-training-app-bb7c2.firebasestorage.app", // Replace if necessary
-            messagingSenderId: "283141747166", // Replace if necessary
-            appId: "1:283141747166:web:eb7ca8b7738e9b14a86d4f", // Replace if necessary
-            measurementId: "G-313596EHTD" // Replace if necessary (optional)
+        // --- Firebase Config ---
+        const firebaseConfig ={ /* PASTE YOUR CONFIG HERE */
+            apiKey: "AIzaSyAYdn17zrJgCvmartYmjTvRasY8LoWNsKA",
+            authDomain: "forklift-training-app-bb7c2.firebaseapp.com",
+            projectId: "forklift-training-app-bb7c2",
+            storageBucket: "forklift-training-app-bb7c2.firebasestorage.app",
+            messagingSenderId: "283141747166",
+            appId: "1:283141747166:web:eb7ca8b7738e9b14a86d4f",
+            measurementId: "G-313596EHTD"
         };
-        // --- END OF FIREBASE CONFIGURATION ---
+        // --- End Config ---
 
-        // Get references to HTML elements
+        // DOM Elements & Global State (same as before)
         const fetchButton = document.getElementById('fetch-button');
+        const downloadCsvButton = document.getElementById('download-csv-button');
         const dataOutput = document.getElementById('data-output');
+        const dashboardOutput = document.getElementById('dashboard-output');
+        const dashboardMessage = document.getElementById('dashboard-message');
         const errorMessage = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
         const loadingIndicator = document.getElementById('loading');
         const configStatusDiv = document.getElementById('config-status');
+        const tabTableButton = document.getElementById('tab-table');
+        const tabDashboardButton = document.getElementById('tab-dashboard');
+        const tableView = document.getElementById('table-view');
+        const dashboardView = document.getElementById('dashboard-view');
+        let db;
+        let tableData = [];
+        let tableHeaders = [];
+        let currentSort = { columnIndex: -1, ascending: true };
+        let chartInstances = {};
 
-        let db; // Variable to hold the Firestore database instance
-        let tableData = []; // Array to hold the fetched data for sorting
-        let tableHeaders = []; // Array to hold the determined table headers
-        let currentSort = { // Object to track current sort state
-            columnIndex: -1, // Index of the column being sorted
-            ascending: true    // Sort direction
-        };
-
-        // Function to initialize Firebase and check config
+        // --- Initialization ---
+        // initializeFirebase function (same as before)
         function initializeFirebase() {
             try {
-                // Basic check if config looks like the placeholder
                 if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.projectId || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
                    configStatusDiv.textContent = "❌ Firebase Configuration Might Be Missing or Incorrect! Please verify the config details in the script section.";
-                   configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-yellow-100 text-yellow-800'; // Warning color
-                   // Allow initialization attempt anyway, but warn user
+                   configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-yellow-100 text-yellow-800';
                 }
-
-                // Initialize Firebase
                 firebase.initializeApp(firebaseConfig);
-
-                // Get a Firestore instance (Compat version)
                 db = firebase.firestore();
-
-                // Check if db object was created successfully
                 if (db) {
-                    // Clear status only if it wasn't set to a warning/error before
                      if (!configStatusDiv.textContent.startsWith('❌')) {
                        configStatusDiv.textContent = "✅ Firebase Initialized Successfully.";
                        configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-green-100 text-green-700';
                     }
                     fetchButton.disabled = false;
-                    fetchButton.classList.remove('opacity-50', 'cursor-not-allowed');
-                } else {
-                     throw new Error("Firestore service could not be initialized.");
-                }
+                } else { throw new Error("Firestore service could not be initialized."); }
                 return true;
-
             } catch (error) {
                 console.error("Firebase initialization error:", error);
                 configStatusDiv.textContent = `❌ Firebase Initialization Failed: ${error.message}`;
                 configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-red-100 text-red-700';
                 fetchButton.disabled = true;
-                fetchButton.classList.add('opacity-50', 'cursor-not-allowed');
-                showError(`Firebase Initialization Failed: ${error.message}. Please check the console and your firebaseConfig object.`);
+                showError(`Firebase Initialization Failed: ${error.message}. Check console and config.`);
                 return false;
             }
         }
 
-        // Function to display errors
-        function showError(message) {
-            errorText.textContent = message;
-            errorMessage.classList.remove('hidden');
-        }
 
-        // Function to hide errors
-        function hideError() {
-            errorMessage.classList.add('hidden');
-        }
-
-        // Function to format data for display (handles Timestamps, Objects, Arrays)
-        function formatCellData(data) {
-            if (data === null || typeof data === 'undefined') {
-                return ''; // Display empty string for null/undefined
-            }
-            // Check if it's a Firestore Timestamp
-            if (data && typeof data.toDate === 'function') {
-                return data.toDate().toLocaleString(); // Convert Timestamp to readable date/time string
-            }
-            // Check if it's an object or array (and not null)
-            if (typeof data === 'object') {
-                // Use <pre> for better formatting of JSON
-                return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
-            }
-            // Otherwise, return the data as is (implicitly converted to string)
-            return data;
-        }
-
-         // Function to render the table based on tableData and tableHeaders
-        function renderTable() {
-            if (tableHeaders.length === 0) {
-                 dataOutput.innerHTML = `<p class="text-gray-500">No data found or no fields detected in the 'quizResults' collection.</p>`;
-                 return;
-            }
-
-            // Create table structure
-            let tableHtml = '<table class="min-w-full divide-y divide-gray-200">';
-            // Create table header row
-            tableHtml += '<thead class="bg-gray-50"><tr>';
-            tableHeaders.forEach((header, index) => {
-                let sortClass = '';
-                let sortIndicator = '<span class="sort-indicator"><span class="asc">▲</span><span class="desc">▼</span></span>'; // Up/Down arrows
-                if (index === currentSort.columnIndex) {
-                    sortClass = currentSort.ascending ? 'sort-asc' : 'sort-desc';
-                }
-                // Add data-index for click handling
-                tableHtml += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortClass}" data-index="${index}">${header}${sortIndicator}</th>`;
-            });
-            tableHtml += '</tr></thead>';
-
-            // Create table body
-            tableHtml += '<tbody class="bg-white divide-y divide-gray-200">';
-            tableData.forEach(docData => {
-                tableHtml += '<tr>';
-                tableHeaders.forEach(header => {
-                    // Get the data for the current header, format it for display
-                    const cellValue = formatCellData(docData[header]);
-                    tableHtml += `<td class="px-6 py-4 whitespace-normal text-sm text-gray-900">${cellValue}</td>`; // Use whitespace-normal, padding
-                });
-                tableHtml += '</tr>';
-            });
-            tableHtml += '</tbody></table>';
-
-            // Update the DOM
-            dataOutput.innerHTML = tableHtml;
-
-            // Add event listeners to the newly created headers for sorting
-            addSortListeners();
-        }
-
-        // Function to add click listeners to table headers
-        function addSortListeners() {
-            const headers = dataOutput.querySelectorAll('th');
-            headers.forEach(th => {
-                th.addEventListener('click', handleSortClick);
-            });
-        }
-
-        // Function to handle clicking on a table header for sorting
-        function handleSortClick(event) {
-            const clickedIndex = parseInt(event.currentTarget.getAttribute('data-index'), 10);
-
-            // Determine new sort direction
-            let ascending = true;
-            if (clickedIndex === currentSort.columnIndex) {
-                ascending = !currentSort.ascending; // Toggle direction if same column clicked
-            }
-
-            // Update current sort state
-            currentSort = { columnIndex: clickedIndex, ascending: ascending };
-
-            // Sort the data
-            sortTableData();
-
-            // Re-render the table with sorted data
-            renderTable();
-        }
-
-        // Function to sort the tableData array based on currentSort state
-        function sortTableData() {
-            const { columnIndex, ascending } = currentSort;
-            const headerToSort = tableHeaders[columnIndex];
-
-            tableData.sort((a, b) => {
-                let valA = a[headerToSort];
-                let valB = b[headerToSort];
-
-                // Handle potential Firestore Timestamps by comparing their millisecond values
-                 if (valA && typeof valA.toMillis === 'function') valA = valA.toMillis();
-                 if (valB && typeof valB.toMillis === 'function') valB = valB.toMillis();
-
-                // Handle undefined/null values - place them at the end when ascending
-                if (valA == null && valB == null) return 0;
-                if (valA == null) return 1; // a is null, comes after b
-                if (valB == null) return -1; // b is null, comes after a
-
-                // Attempt numeric comparison first
-                const numA = parseFloat(valA);
-                const numB = parseFloat(valB);
-
-                let comparison = 0;
-                // Check if both values are numbers or can be reliably converted to numbers
-                // Also check if the original types were not strings to avoid sorting "10" before "2" incorrectly
-                const canCompareNumerically = !isNaN(numA) && !isNaN(numB) && typeof valA !== 'string' && typeof valB !== 'string';
-
-                if (canCompareNumerically) {
-                    // Compare as numbers
-                    comparison = numA - numB;
-                } else {
-                    // Compare as strings (case-insensitive)
-                    // Convert non-strings to string for comparison only if numeric comparison failed
-                    const strA = String(valA).toLowerCase();
-                    const strB = String(valB).toLowerCase();
-                    if (strA < strB) {
-                        comparison = -1;
-                    } else if (strA > strB) {
-                        comparison = 1;
-                    }
-                }
+        // --- UI Helpers ---
+        // showError, hideError, formatCellData, switchTab functions (same as before)
+        function showError(message) { errorText.textContent = message; errorMessage.classList.remove('hidden'); }
+        function hideError() { errorMessage.classList.add('hidden'); }
+        function formatCellData(data) { if (data === null || typeof data === 'undefined') return ''; if (data && typeof data.toDate === 'function') return data.toDate().toLocaleString(); if (typeof data === 'object') return `<pre>${JSON.stringify(data, null, 2)}</pre>`; return data; }
+        function switchTab(tabName) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active')); document.getElementById(`${tabName}-view`).classList.add('active'); document.getElementById(`tab-${tabName}`).classList.add('active'); }
 
 
-                // Apply ascending/descending direction
-                return ascending ? comparison : comparison * -1;
-            });
-        }
-
-
-        // Function to fetch and display data for 'quizResults'
+        // --- Data Fetching ---
+        // fetchData function (same as before)
         async function fetchData() {
-            if (!db) {
-                showError("Firebase is not initialized. Please check your configuration.");
-                return;
-            }
-
-            const collectionName = "quizResults"; // Hardcoded collection name
-
-            // Clear previous output and errors, show loading
+            if (!db) { showError("Firebase not initialized."); return; }
+            const collectionName = "quizResults";
             hideError();
-            dataOutput.innerHTML = ''; // Clear previous data
+            dataOutput.innerHTML = 'Fetching...';
+            dashboardMessage.textContent = 'Fetching data...';
+            Object.values(chartInstances).forEach(chart => chart.destroy()); // Destroy old charts
+            chartInstances = {};
             loadingIndicator.classList.remove('hidden');
             fetchButton.disabled = true;
-            fetchButton.classList.add('opacity-50');
-            tableData = []; // Reset data array
-            tableHeaders = []; // Reset headers array
-            currentSort = { columnIndex: -1, ascending: true }; // Reset sort state
+            downloadCsvButton.disabled = true; // Disable CSV button during fetch
+            tableData = []; tableHeaders = [];
+            currentSort = { columnIndex: -1, ascending: true };
 
             try {
-                // Get a reference to the collection
-                const collectionRef = db.collection(collectionName);
-
-                // Fetch the documents
-                const querySnapshot = await collectionRef.get();
-
+                const querySnapshot = await db.collection(collectionName).get();
                 if (querySnapshot.empty) {
-                    dataOutput.innerHTML = `<p class="text-gray-500">No documents found in the '${collectionName}' collection.</p>`;
+                    dataOutput.innerHTML = `<p class="text-gray-500">No documents found in '${collectionName}'.</p>`;
+                     dashboardMessage.textContent = `No documents found in '${collectionName}'.`;
                 } else {
-                    // --- Determine all unique headers from all documents ---
                     const uniqueHeaders = new Set();
                     querySnapshot.forEach((doc) => {
                         const data = doc.data();
-                        // Ensure data is an object before trying to get keys
                         if (data && typeof data === 'object') {
                             Object.keys(data).forEach(key => uniqueHeaders.add(key));
-                            // Store document data along with its ID
-                             tableData.push({ id: doc.id, ...data });
+                            tableData.push({ id: doc.id, ...data });
                         } else {
-                             console.warn(`Document ${doc.id} has non-object data:`, data);
-                             // Optionally handle non-object data (e.g., push with a placeholder)
-                             tableData.push({ id: doc.id, _error: "Invalid data format" });
-                             uniqueHeaders.add('_error');
+                            console.warn(`Doc ${doc.id} has non-object data:`, data);
+                            tableData.push({ id: doc.id, _error: "Invalid data format" });
+                            uniqueHeaders.add('_error');
                         }
                     });
-                    // Convert Set to array, sort headers alphabetically
                     tableHeaders = Array.from(uniqueHeaders).sort();
-                    // Optional: Add 'Document ID' as the first column
-                    // We store the ID in tableData, so let's add it as a header if needed
-                    // tableHeaders.unshift('id'); // Uncomment if you want ID as a sortable column
-
-                    // Render the initial table (unsorted)
-                    renderTable();
+                    renderTable(); // Render the data table
+                    renderDashboard(); // Render the dashboard charts
+                    downloadCsvButton.disabled = false; // Enable CSV button
+                    dashboardMessage.textContent = ''; // Clear dashboard message
                 }
-
             } catch (error) {
                 console.error("Error fetching data: ", error);
-                showError(`Failed to fetch data from '${collectionName}'. Error: ${error.message}. Check collection name and Firestore Security Rules.`);
-                dataOutput.innerHTML = ''; // Clear output on error
+                showError(`Failed to fetch data from '${collectionName}'. Error: ${error.message}. Check collection name and Firestore Rules.`);
+                dataOutput.innerHTML = '';
+                dashboardMessage.textContent = 'Error loading dashboard data.';
             } finally {
-                // Hide loading indicator and re-enable button
                 loadingIndicator.classList.add('hidden');
                 fetchButton.disabled = false;
-                fetchButton.classList.remove('opacity-50');
             }
         }
 
-        // --- Initialize Firebase when the script loads ---
-        initializeFirebase();
 
-        // Add event listener to the button
+        // --- Table Rendering & Sorting ---
+        // renderTable, addSortListeners, handleSortClick, sortTableData functions (same as before)
+         function renderTable() { if (tableHeaders.length === 0 && tableData.length > 0) { dataOutput.innerHTML = `<p class="text-red-500">Data fetched, but could not determine table headers. Check data format.</p>`; return; } if (tableHeaders.length === 0) { if (!dataOutput.textContent.includes('No documents found')) { dataOutput.innerHTML = `<p class="text-gray-500">Click the "Fetch Data" button above.</p>`; } return; } let tableHtml = '<table class="min-w-full divide-y divide-gray-200">'; tableHtml += '<thead class="bg-gray-50"><tr>'; tableHeaders.forEach((header, index) => { let sortClass = ''; let sortIndicator = '<span class="sort-indicator"><span class="asc">▲</span><span class="desc">▼</span></span>'; if (index === currentSort.columnIndex) sortClass = currentSort.ascending ? 'sort-asc' : 'sort-desc'; tableHtml += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortClass}" data-index="${index}">${header}${sortIndicator}</th>`; }); tableHtml += '</tr></thead>'; tableHtml += '<tbody class="bg-white divide-y divide-gray-200">'; tableData.forEach(docData => { tableHtml += '<tr>'; tableHeaders.forEach(header => { const cellValue = formatCellData(docData[header]); tableHtml += `<td class="px-6 py-4 whitespace-normal text-sm text-gray-900">${cellValue}</td>`; }); tableHtml += '</tr>'; }); tableHtml += '</tbody></table>'; dataOutput.innerHTML = tableHtml; addSortListeners(); }
+         function addSortListeners() { const headers = dataOutput.querySelectorAll('th'); headers.forEach(th => { th.removeEventListener('click', handleSortClick); th.addEventListener('click', handleSortClick); }); }
+         function handleSortClick(event) { const clickedIndex = parseInt(event.currentTarget.getAttribute('data-index'), 10); let ascending = true; if (clickedIndex === currentSort.columnIndex) ascending = !currentSort.ascending; currentSort = { columnIndex: clickedIndex, ascending: ascending }; sortTableData(); renderTable(); }
+         function sortTableData() { const { columnIndex, ascending } = currentSort; if (columnIndex < 0 || columnIndex >= tableHeaders.length) return; const headerToSort = tableHeaders[columnIndex]; tableData.sort((a, b) => { let valA = a[headerToSort]; let valB = b[headerToSort]; if (valA && typeof valA.toMillis === 'function') valA = valA.toMillis(); if (valB && typeof valB.toMillis === 'function') valB = valB.toMillis(); if (valA == null && valB == null) return 0; if (valA == null) return 1; if (valB == null) return -1; const numA = parseFloat(valA); const numB = parseFloat(valB); let comparison = 0; const canCompareNumerically = !isNaN(numA) && !isNaN(numB) && typeof valA !== 'string' && typeof valB !== 'string'; if (canCompareNumerically) { comparison = numA - numB; } else { const strA = String(valA).toLowerCase(); const strB = String(valB).toLowerCase(); if (strA < strB) comparison = -1; else if (strA > strB) comparison = 1; } return ascending ? comparison : comparison * -1; }); }
+
+
+        // --- CSV Download ---
+        // downloadCSV function (same as before)
+        function downloadCSV() { if (tableData.length === 0) { showError("No data available to download."); return; } const headerRow = tableHeaders.map(header => `"${String(header).replace(/"/g, '""')}"`).join(','); const dataRows = tableData.map(row => { return tableHeaders.map(header => { let cellValue = row[header]; if (cellValue === null || typeof cellValue === 'undefined') { return ''; } if (cellValue && typeof cellValue.toDate === 'function') { try { cellValue = cellValue.toDate().toISOString(); } catch (e) { cellValue = 'Invalid Date'; } } else if (typeof cellValue === 'object') { cellValue = JSON.stringify(cellValue); } return `"${String(cellValue).replace(/"/g, '""')}"`; }).join(','); }); const csvContent = [headerRow, ...dataRows].join('\n'); const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement("a"); if (link.download !== undefined) { const url = URL.createObjectURL(blob); link.setAttribute("href", url); link.setAttribute("download", "quizResults.csv"); link.style.visibility = 'hidden'; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); } else { showError("CSV download is not supported in your browser."); } }
+
+
+        // --- Dashboard Rendering ---
+        function renderDashboard() {
+            if (tableData.length === 0) {
+                dashboardMessage.textContent = 'No data available for dashboard.';
+                return;
+            }
+            Object.values(chartInstances).forEach(chart => chart.destroy());
+            chartInstances = {};
+
+             // Define requested colors
+             const colorYellowOrange = '#FFB71B';
+             const colorDarkGray = '#58585A';
+             const colorYellowOrangeTransparent = 'rgba(255, 183, 27, 0.6)'; // #FFB71B with alpha
+             const colorDarkGrayTransparent = 'rgba(88, 88, 90, 0.6)';    // #58585A with alpha
+
+
+             try {
+                // --- Chart 1: Score Distribution (Bar Chart) ---
+                const scoreField = 'quizPercentage'; // <--- ADAPT THIS FIELD NAME
+                const scoreChartCanvas = document.getElementById('scoreDistributionChart');
+                const scoreChartTitle = scoreChartCanvas.previousElementSibling; // Get the h3 title
+                scoreChartCanvas.style.display = 'block'; // Ensure canvas is visible initially
+                scoreChartTitle.textContent = 'Score Distribution'; // Reset title text
+
+                if (tableHeaders.includes(scoreField)) {
+                    const scores = tableData.map(item => item[scoreField]).filter(s => typeof s === 'number');
+                    const scoreBins = { '0-19': 0, '20-39': 0, '40-59': 0, '60-79': 0, '80-100': 0, 'Other': 0 };
+                    scores.forEach(s => { /* ... binning logic ... */
+                         if (s >= 0 && s < 20) scoreBins['0-19']++; else if (s >= 20 && s < 40) scoreBins['20-39']++; else if (s >= 40 && s < 60) scoreBins['40-59']++; else if (s >= 60 && s < 80) scoreBins['60-79']++; else if (s >= 80 && s <= 100) scoreBins['80-100']++; else scoreBins['Other']++;
+                     });
+                    const scoreCtx = scoreChartCanvas.getContext('2d');
+                    chartInstances.scoreChart = new Chart(scoreCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(scoreBins),
+                            datasets: [{
+                                label: 'Number of Results',
+                                data: Object.values(scoreBins),
+                                // Use new colors
+                                backgroundColor: colorYellowOrangeTransparent,
+                                borderColor: colorYellowOrange,
+                                borderWidth: 1
+                            }]
+                        },
+                        options: { scales: { y: { beginAtZero: true, title: { display: true, text: 'Count' } } }, responsive: true, maintainAspectRatio: false }
+                    });
+                } else {
+                     scoreChartCanvas.style.display = 'none'; // Hide canvas if field missing
+                     scoreChartTitle.textContent += ` (Field '${scoreField}' not found)`; // Update title
+                }
+
+
+                // --- Chart 2: Pass/Fail Rate (Pie Chart) ---
+                const passField = 'passFail'; // <--- ADAPT THIS FIELD NAME
+                const passFailChartCanvas = document.getElementById('passFailChart');
+                const passFailChartTitle = passFailChartCanvas.previousElementSibling;
+                passFailChartCanvas.style.display = 'block';
+                passFailChartTitle.textContent = 'Pass/Fail Rate';
+
+                if (tableHeaders.includes(passField)) {
+                    let passCount = 0; let failCount = 0;
+                    tableData.forEach(item => { if (item[passField] === "Pass") passCount++; else if (item[passField] === "Fail") failCount++; });
+                    const passFailCtx = passFailChartCanvas.getContext('2d');
+                    chartInstances.passFailChart = new Chart(passFailCtx, {
+                        type: 'pie',
+                        data: {
+                            labels: ['Passed', 'Failed'],
+                            datasets: [{
+                                label: 'Pass/Fail Rate',
+                                data: [passCount, failCount],
+                                // Use new colors: Yellow/Orange for Pass, Gray for Fail
+                                backgroundColor: [colorYellowOrangeTransparent, colorDarkGrayTransparent],
+                                borderColor: [colorYellowOrange, colorDarkGray],
+                                borderWidth: 1
+                            }]
+                        },
+                         options: { responsive: true, maintainAspectRatio: false }
+                    });
+                 } else {
+                     passFailChartCanvas.style.display = 'none';
+                     passFailChartTitle.textContent += ` (Field '${passField}' not found)`;
+                 }
+
+
+                // --- Chart 3: Results per Quiz (Bar Chart) ---
+                const quizNameField = 'xlcId'; // <--- ADAPT THIS FIELD NAME
+                const resultsPerQuizChartCanvas = document.getElementById('resultsPerQuizChart');
+                const resultsPerQuizChartTitle = resultsPerQuizChartCanvas.previousElementSibling;
+                resultsPerQuizChartCanvas.style.display = 'block';
+                resultsPerQuizChartTitle.textContent = 'Results per Quiz';
+
+                if (tableHeaders.includes(quizNameField)) {
+                    const resultsPerQuiz = {};
+                    tableData.forEach(item => { const quizName = item[quizNameField] || 'Unnamed Quiz'; resultsPerQuiz[quizName] = (resultsPerQuiz[quizName] || 0) + 1; });
+                    const resultsCtx = resultsPerQuizChartCanvas.getContext('2d');
+                    chartInstances.resultsPerQuizChart = new Chart(resultsCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: Object.keys(resultsPerQuiz),
+                            datasets: [{
+                                label: 'Number of Attempts',
+                                data: Object.values(resultsPerQuiz),
+                                // Use new color (Gray)
+                                backgroundColor: colorDarkGrayTransparent,
+                                borderColor: colorDarkGray,
+                                borderWidth: 1
+                            }]
+                        },
+                        options: { scales: { y: { beginAtZero: true, title: { display: true, text: 'Count' } } }, responsive: true, maintainAspectRatio: false }
+                    });
+                 } else {
+                     resultsPerQuizChartCanvas.style.display = 'none';
+                     resultsPerQuizChartTitle.textContent += ` (Field '${quizNameField}' not found)`;
+                 }
+
+             } catch (error) {
+                 console.error("Error rendering dashboard:", error);
+                 dashboardMessage.textContent = `Error rendering dashboard: ${error.message}`;
+             }
+        }
+
+        // --- Event Listeners ---
         fetchButton.addEventListener('click', fetchData);
+        downloadCsvButton.addEventListener('click', downloadCSV);
+
+        // --- Initial Load ---
+        initializeFirebase();
+        switchTab('table'); // Start on the table tab
 
     </script>
 
