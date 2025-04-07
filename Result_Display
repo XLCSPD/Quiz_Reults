@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 'quizResults' Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Styles for table and sorting indicators */
+        table {
+            width: 100%;
+            border-collapse: collapse; /* Combine cell borders */
+        }
+        th, td {
+            border: 1px solid #ddd; /* Add borders to cells */
+            padding: 10px; /* Add padding within cells */
+            text-align: left; /* Align text to the left */
+            vertical-align: top; /* Align content to the top */
+        }
+        th {
+            background-color: #f2f2f2; /* Light grey background for headers */
+            cursor: pointer; /* Indicate headers are clickable */
+            position: relative; /* Needed for positioning sort indicators */
+            user-select: none; /* Prevent text selection on click */
+        }
+        /* Style for the sort indicators (arrows) */
+        th .sort-indicator {
+            position: absolute;
+            right: 10px; /* Position indicator to the right */
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.8em;
+            color: #666; /* Grey color for indicators */
+        }
+        /* Hide indicators by default */
+        th .sort-indicator .asc,
+        th .sort-indicator .desc {
+            display: none;
+        }
+        /* Show the correct indicator based on sort direction */
+        th.sort-asc .sort-indicator .asc { display: inline; }
+        th.sort-desc .sort-indicator .desc { display: inline; }
+
+        /* Basic styles for preformatted text within table cells */
+        td pre {
+            background-color: #f8f8f8;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 5px;
+            margin: 0; /* Remove default margin */
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 0.9em; /* Slightly smaller font for pre */
+        }
+         /* Ensure Inter font is loaded */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom style for SERVICES text to increase letter spacing more */
+        .services-text {
+            letter-spacing: 0.15em; /* Adjust this value for desired spacing */
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet"> </head>
+<body class="bg-gray-100 font-['Inter']">
+
+    <div class="container mx-auto p-6">
+
+        <div class="text-center mb-8">
+            <div class="text-5xl font-black text-black tracking-tight">
+                XLC
+            </div>
+            <div class="text-xl font-medium text-black uppercase services-text mt-1">
+                SERVICES
+            </div>
+        </div>
+
+        <h1 class="text-2xl font-bold mb-4 text-center text-gray-800">Firebase 'quizResults' Data Viewer</h1>
+
+        <div id="config-status" class="mb-4 p-3 rounded-lg text-center font-semibold">
+            </div>
+
+        <div class="bg-white p-4 rounded-lg shadow-md mb-6 text-center">
+             <p class="text-sm text-gray-600 mb-2">Click the button to fetch and display data from the 'quizResults' collection.</p>
+            <button id="fetch-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                Fetch 'quizResults' Data
+            </button>
+        </div>
+
+        <div id="loading" class="text-center my-4 hidden">
+            <p class="text-indigo-600">Loading data...</p>
+            <div class="inline-block animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+
+        <div id="error-message" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 hidden" role="alert">
+            <strong class="font-bold">Error:</strong>
+            <span class="block sm:inline" id="error-text"></span>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
+            <h2 class="text-xl font-semibold mb-3 text-gray-700">Data:</h2>
+            <div id="data-output" class="text-sm text-gray-800">
+                Click the button above to fetch data.
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <script>
+        // --- STEP 1: PASTE YOUR FIREBASE CONFIGURATION HERE ---
+        // Ensure this configuration is correct for your project.
+        const firebaseConfig ={
+            apiKey: "AIzaSyAYdn17zrJgCvmartYmjTvRasY8LoWNsKA", // Replace if necessary
+            authDomain: "forklift-training-app-bb7c2.firebaseapp.com", // Replace if necessary
+            projectId: "forklift-training-app-bb7c2", // Replace if necessary
+            storageBucket: "forklift-training-app-bb7c2.firebasestorage.app", // Replace if necessary
+            messagingSenderId: "283141747166", // Replace if necessary
+            appId: "1:283141747166:web:eb7ca8b7738e9b14a86d4f", // Replace if necessary
+            measurementId: "G-313596EHTD" // Replace if necessary (optional)
+        };
+        // --- END OF FIREBASE CONFIGURATION ---
+
+        // Get references to HTML elements
+        const fetchButton = document.getElementById('fetch-button');
+        const dataOutput = document.getElementById('data-output');
+        const errorMessage = document.getElementById('error-message');
+        const errorText = document.getElementById('error-text');
+        const loadingIndicator = document.getElementById('loading');
+        const configStatusDiv = document.getElementById('config-status');
+
+        let db; // Variable to hold the Firestore database instance
+        let tableData = []; // Array to hold the fetched data for sorting
+        let tableHeaders = []; // Array to hold the determined table headers
+        let currentSort = { // Object to track current sort state
+            columnIndex: -1, // Index of the column being sorted
+            ascending: true    // Sort direction
+        };
+
+        // Function to initialize Firebase and check config
+        function initializeFirebase() {
+            try {
+                // Basic check if config looks like the placeholder
+                if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.projectId || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
+                   configStatusDiv.textContent = "❌ Firebase Configuration Might Be Missing or Incorrect! Please verify the config details in the script section.";
+                   configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-yellow-100 text-yellow-800'; // Warning color
+                   // Allow initialization attempt anyway, but warn user
+                }
+
+                // Initialize Firebase
+                firebase.initializeApp(firebaseConfig);
+
+                // Get a Firestore instance (Compat version)
+                db = firebase.firestore();
+
+                // Check if db object was created successfully
+                if (db) {
+                    // Clear status only if it wasn't set to a warning/error before
+                     if (!configStatusDiv.textContent.startsWith('❌')) {
+                       configStatusDiv.textContent = "✅ Firebase Initialized Successfully.";
+                       configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-green-100 text-green-700';
+                    }
+                    fetchButton.disabled = false;
+                    fetchButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                     throw new Error("Firestore service could not be initialized.");
+                }
+                return true;
+
+            } catch (error) {
+                console.error("Firebase initialization error:", error);
+                configStatusDiv.textContent = `❌ Firebase Initialization Failed: ${error.message}`;
+                configStatusDiv.className = 'mb-4 p-3 rounded-lg text-center font-semibold bg-red-100 text-red-700';
+                fetchButton.disabled = true;
+                fetchButton.classList.add('opacity-50', 'cursor-not-allowed');
+                showError(`Firebase Initialization Failed: ${error.message}. Please check the console and your firebaseConfig object.`);
+                return false;
+            }
+        }
+
+        // Function to display errors
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        // Function to hide errors
+        function hideError() {
+            errorMessage.classList.add('hidden');
+        }
+
+        // Function to format data for display (handles Timestamps, Objects, Arrays)
+        function formatCellData(data) {
+            if (data === null || typeof data === 'undefined') {
+                return ''; // Display empty string for null/undefined
+            }
+            // Check if it's a Firestore Timestamp
+            if (data && typeof data.toDate === 'function') {
+                return data.toDate().toLocaleString(); // Convert Timestamp to readable date/time string
+            }
+            // Check if it's an object or array (and not null)
+            if (typeof data === 'object') {
+                // Use <pre> for better formatting of JSON
+                return `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            }
+            // Otherwise, return the data as is (implicitly converted to string)
+            return data;
+        }
+
+         // Function to render the table based on tableData and tableHeaders
+        function renderTable() {
+            if (tableHeaders.length === 0) {
+                 dataOutput.innerHTML = `<p class="text-gray-500">No data found or no fields detected in the 'quizResults' collection.</p>`;
+                 return;
+            }
+
+            // Create table structure
+            let tableHtml = '<table class="min-w-full divide-y divide-gray-200">';
+            // Create table header row
+            tableHtml += '<thead class="bg-gray-50"><tr>';
+            tableHeaders.forEach((header, index) => {
+                let sortClass = '';
+                let sortIndicator = '<span class="sort-indicator"><span class="asc">▲</span><span class="desc">▼</span></span>'; // Up/Down arrows
+                if (index === currentSort.columnIndex) {
+                    sortClass = currentSort.ascending ? 'sort-asc' : 'sort-desc';
+                }
+                // Add data-index for click handling
+                tableHtml += `<th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${sortClass}" data-index="${index}">${header}${sortIndicator}</th>`;
+            });
+            tableHtml += '</tr></thead>';
+
+            // Create table body
+            tableHtml += '<tbody class="bg-white divide-y divide-gray-200">';
+            tableData.forEach(docData => {
+                tableHtml += '<tr>';
+                tableHeaders.forEach(header => {
+                    // Get the data for the current header, format it for display
+                    const cellValue = formatCellData(docData[header]);
+                    tableHtml += `<td class="px-6 py-4 whitespace-normal text-sm text-gray-900">${cellValue}</td>`; // Use whitespace-normal, padding
+                });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+
+            // Update the DOM
+            dataOutput.innerHTML = tableHtml;
+
+            // Add event listeners to the newly created headers for sorting
+            addSortListeners();
+        }
+
+        // Function to add click listeners to table headers
+        function addSortListeners() {
+            const headers = dataOutput.querySelectorAll('th');
+            headers.forEach(th => {
+                th.addEventListener('click', handleSortClick);
+            });
+        }
+
+        // Function to handle clicking on a table header for sorting
+        function handleSortClick(event) {
+            const clickedIndex = parseInt(event.currentTarget.getAttribute('data-index'), 10);
+
+            // Determine new sort direction
+            let ascending = true;
+            if (clickedIndex === currentSort.columnIndex) {
+                ascending = !currentSort.ascending; // Toggle direction if same column clicked
+            }
+
+            // Update current sort state
+            currentSort = { columnIndex: clickedIndex, ascending: ascending };
+
+            // Sort the data
+            sortTableData();
+
+            // Re-render the table with sorted data
+            renderTable();
+        }
+
+        // Function to sort the tableData array based on currentSort state
+        function sortTableData() {
+            const { columnIndex, ascending } = currentSort;
+            const headerToSort = tableHeaders[columnIndex];
+
+            tableData.sort((a, b) => {
+                let valA = a[headerToSort];
+                let valB = b[headerToSort];
+
+                // Handle potential Firestore Timestamps by comparing their millisecond values
+                 if (valA && typeof valA.toMillis === 'function') valA = valA.toMillis();
+                 if (valB && typeof valB.toMillis === 'function') valB = valB.toMillis();
+
+                // Handle undefined/null values - place them at the end when ascending
+                if (valA == null && valB == null) return 0;
+                if (valA == null) return 1; // a is null, comes after b
+                if (valB == null) return -1; // b is null, comes after a
+
+                // Attempt numeric comparison first
+                const numA = parseFloat(valA);
+                const numB = parseFloat(valB);
+
+                let comparison = 0;
+                // Check if both values are numbers or can be reliably converted to numbers
+                // Also check if the original types were not strings to avoid sorting "10" before "2" incorrectly
+                const canCompareNumerically = !isNaN(numA) && !isNaN(numB) && typeof valA !== 'string' && typeof valB !== 'string';
+
+                if (canCompareNumerically) {
+                    // Compare as numbers
+                    comparison = numA - numB;
+                } else {
+                    // Compare as strings (case-insensitive)
+                    // Convert non-strings to string for comparison only if numeric comparison failed
+                    const strA = String(valA).toLowerCase();
+                    const strB = String(valB).toLowerCase();
+                    if (strA < strB) {
+                        comparison = -1;
+                    } else if (strA > strB) {
+                        comparison = 1;
+                    }
+                }
+
+
+                // Apply ascending/descending direction
+                return ascending ? comparison : comparison * -1;
+            });
+        }
+
+
+        // Function to fetch and display data for 'quizResults'
+        async function fetchData() {
+            if (!db) {
+                showError("Firebase is not initialized. Please check your configuration.");
+                return;
+            }
+
+            const collectionName = "quizResults"; // Hardcoded collection name
+
+            // Clear previous output and errors, show loading
+            hideError();
+            dataOutput.innerHTML = ''; // Clear previous data
+            loadingIndicator.classList.remove('hidden');
+            fetchButton.disabled = true;
+            fetchButton.classList.add('opacity-50');
+            tableData = []; // Reset data array
+            tableHeaders = []; // Reset headers array
+            currentSort = { columnIndex: -1, ascending: true }; // Reset sort state
+
+            try {
+                // Get a reference to the collection
+                const collectionRef = db.collection(collectionName);
+
+                // Fetch the documents
+                const querySnapshot = await collectionRef.get();
+
+                if (querySnapshot.empty) {
+                    dataOutput.innerHTML = `<p class="text-gray-500">No documents found in the '${collectionName}' collection.</p>`;
+                } else {
+                    // --- Determine all unique headers from all documents ---
+                    const uniqueHeaders = new Set();
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        // Ensure data is an object before trying to get keys
+                        if (data && typeof data === 'object') {
+                            Object.keys(data).forEach(key => uniqueHeaders.add(key));
+                            // Store document data along with its ID
+                             tableData.push({ id: doc.id, ...data });
+                        } else {
+                             console.warn(`Document ${doc.id} has non-object data:`, data);
+                             // Optionally handle non-object data (e.g., push with a placeholder)
+                             tableData.push({ id: doc.id, _error: "Invalid data format" });
+                             uniqueHeaders.add('_error');
+                        }
+                    });
+                    // Convert Set to array, sort headers alphabetically
+                    tableHeaders = Array.from(uniqueHeaders).sort();
+                    // Optional: Add 'Document ID' as the first column
+                    // We store the ID in tableData, so let's add it as a header if needed
+                    // tableHeaders.unshift('id'); // Uncomment if you want ID as a sortable column
+
+                    // Render the initial table (unsorted)
+                    renderTable();
+                }
+
+            } catch (error) {
+                console.error("Error fetching data: ", error);
+                showError(`Failed to fetch data from '${collectionName}'. Error: ${error.message}. Check collection name and Firestore Security Rules.`);
+                dataOutput.innerHTML = ''; // Clear output on error
+            } finally {
+                // Hide loading indicator and re-enable button
+                loadingIndicator.classList.add('hidden');
+                fetchButton.disabled = false;
+                fetchButton.classList.remove('opacity-50');
+            }
+        }
+
+        // --- Initialize Firebase when the script loads ---
+        initializeFirebase();
+
+        // Add event listener to the button
+        fetchButton.addEventListener('click', fetchData);
+
+    </script>
+
+</body>
+</html>
